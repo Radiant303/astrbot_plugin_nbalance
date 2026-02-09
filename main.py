@@ -1,24 +1,106 @@
+import aiohttp
+import asyncio
+
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
+from astrbot.api import AstrBotConfig
 
-@register("helloworld", "YourName", "一个简单的 Hello World 插件", "1.0.0")
-class MyPlugin(Star):
-    def __init__(self, context: Context):
+
+@register("balance_checker", "BUGJI", "查询 NewAPI 用户余额", "v1.0.0")
+class BalancePlugin(Star):
+    def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
+        self.config = config
+
+        # 新的配置项
+        self.api_config = self.config.get("api_config", "https://newapi.com").rstrip('/')
+        self.userid = self.config.get("userid", "10001")
+        self.token = self.config.get("token", "token")
+        self.enable_llm_tool: bool = self.config.get("enable_llm_tool", False)
+
+        self.session: aiohttp.ClientSession | None = None
 
     async def initialize(self):
-        """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
-
-    # 注册指令的装饰器。指令名为 helloworld。注册成功后，发送 `/helloworld` 就会触发这个指令，并回复 `你好, {user_name}!`
-    @filter.command("helloworld")
-    async def helloworld(self, event: AstrMessageEvent):
-        """这是一个 hello world 指令""" # 这是 handler 的描述，将会被解析方便用户了解插件内容。建议填写。
-        user_name = event.get_sender_name()
-        message_str = event.message_str # 用户发的纯文本消息字符串
-        message_chain = event.get_messages() # 用户所发的消息的消息链 # from astrbot.api.message_components import *
-        logger.info(message_chain)
-        yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!") # 发送一条纯文本消息
+        logger.info("BalancePlugin initialize called")
 
     async def terminate(self):
-        """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
+        if self.session and not self.session.closed:
+            await self.session.close()
+        logger.info("BalancePlugin 已卸载")
+
+    def _ensure_session(self):
+        if self.session is None or self.session.closed:
+            self.session = aiohttp.ClientSession()
+
+    @filter.command("余额")
+    async def balance(self, event: AstrMessageEvent):
+        result = await self._query_balance()
+        yield event.plain_result(result)
+
+    @filter.llm_tool(name="query_balance")
+    async def query_balance(self, event: AstrMessageEvent) -> MessageEventResult:
+        """
+        查询当前用户的 NewAPI 余额信息
+        """
+        if not self.enable_llm_tool:
+            yield event.plain_result("余额查询 LLM 工具未启用")
+            return
+
+        result = await self._query_balance()
+        yield event.plain_result(result)
+
+    async def _query_balance(self) -> str:
+        """查询余额的核心方法"""
+        # 构建完整 URL
+        url = f"{self.api_config}/api/user/self"
+        
+        # 构建请求头
+        headers = {
+            "New-API-User": self.userid,
+            "Authorization": f"Bearer {self.token}"
+        }
+
+        self._ensure_session()
+
+        try:
+            async with self.session.get(url, headers=headers, timeout=10) as resp:
+                if resp.status != 200:
+                    logger.warning(f"查询余额失败，HTTP {resp.status}")
+                    return f"查询失败，状态码: {resp.status}"
+
+                data = await resp.json()
+                
+                # 解析响应数据（根据常见的 NewAPI 返回格式）
+                # 假设返回格式: {"success": true, "data": {"balance": 100, "used": 50, "total": 150}}
+                if not data.get("success", True):
+                    error_msg = data.get("message", "未知错误")
+                    return f"查询失败: {error_msg}"
+
+                user_data = data.get("data", {})
+                
+                # 提取余额信息（根据实际 API 返回调整字段名）
+                balance = user_data.get("quota", "N/A")
+
+                # 格式化输出
+                result = (
+                    f"{self.api_config}\n"
+                    f"当前余额为：{float(balance)/500000:.2f} 美元"
+                )
+
+                return result
+
+        except asyncio.TimeoutError:
+            logger.error("查询余额超时")
+            return "查询超时，请稍后重试"
+        except aiohttp.ClientError as e:
+            logger.error(f"网络请求错误: {e}")
+            return f"网络错误: {str(e)}"
+        except Exception as e:
+            logger.error(f"查询余额异常: {type(e).__name__}: {e}")
+            return f"查询异常: {str(e)}"
+
+    async def _query_all(self) -> list[str]:
+        """兼容旧接口，返回列表格式"""
+        result = await self._query_balance()
+        return [result]

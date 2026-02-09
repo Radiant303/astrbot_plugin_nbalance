@@ -1,0 +1,23 @@
+{
+    "api_config": {
+        "description": "API配置项目",
+        "type": "string",
+        "default": "https://newapi.com/"
+    },
+    "userid": {
+        "description": "用户ID",
+        "type": "string",
+        "default": "10001"
+    },
+    "token": {
+        "description": "系统令牌",
+        "type": "string",
+        "default": "token"
+    },
+    "enable_llm_tool": {
+        "description": "是否启用 LLM 工具",
+        "type": "bool",
+        "hint": "可以在自然对话查询余额",
+        "default": false
+    }
+}
