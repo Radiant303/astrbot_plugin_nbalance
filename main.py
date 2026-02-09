@@ -94,8 +94,3 @@ class BalancePlugin(Star):
         except Exception as e:
             logger.error(f"查询余额异常: {type(e).__name__}: {e}")
             return f"查询异常: {str(e)}"
-
-    async def _query_all(self) -> list[str]:
-        """兼容旧接口，返回列表格式"""
-        result = await self._query_balance()
-        return [result]
