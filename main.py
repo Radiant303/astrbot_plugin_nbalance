@@ -7,7 +7,7 @@ from astrbot.api import logger
 from astrbot.api import AstrBotConfig
 
 
-@register("balance_checker", "BUGJI", "查询 NewAPI 用户余额", "v1.0.0")
+@register("astrbot_plugin_nbalance", "Radiant303", "查询 NewAPI 用户余额", "v1.0.0")
 class BalancePlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -41,7 +41,7 @@ class BalancePlugin(Star):
     @filter.llm_tool(name="query_balance")
     async def query_balance(self, event: AstrMessageEvent) -> MessageEventResult:
         """
-        查询当前用户的 NewAPI 余额信息
+        查询并返回当前配置的所有余额信息
         """
         if not self.enable_llm_tool:
             yield event.plain_result("余额查询 LLM 工具未启用")
@@ -51,7 +51,6 @@ class BalancePlugin(Star):
         yield event.plain_result(result)
 
     async def _query_balance(self) -> str:
-        """查询余额的核心方法"""
         # 构建完整 URL
         url = f"{self.api_config}/api/user/self"
         
@@ -83,10 +82,7 @@ class BalancePlugin(Star):
                 balance = user_data.get("quota", "N/A")
 
                 # 格式化输出
-                result = (
-                    f"{self.api_config}\n"
-                    f"当前余额为：{float(balance)/500000:.2f} 美元"
-                )
+                result = f"{float(balance)/500000:.2f}美元"
 
                 return result
 

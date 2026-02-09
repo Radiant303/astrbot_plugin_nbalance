@@ -2,7 +2,7 @@
     "api_config": {
         "description": "API配置项目",
         "type": "string",
-        "default": "https://newapi.com/"
+        "default": "https://newapi.com"
     },
     "userid": {
         "description": "用户ID",
