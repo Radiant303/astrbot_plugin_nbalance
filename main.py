@@ -80,8 +80,9 @@ class BalancePlugin(Star):
                 # 提取余额信息（根据实际 API 返回调整字段名）
                 balance = user_data.get("quota", "N/A")
 
-                # 格式化输出
-                result = f"{float(balance) / 500000:.2f}美元"
+                # 格式化输出 500000是newapi的汇率
+                huilv = 500000
+                result = f"{float(balance) / huilv:.2f}美元"
 
                 return result
 
