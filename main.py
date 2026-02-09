@@ -1,10 +1,10 @@
-import aiohttp
 import asyncio
 
-from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+import aiohttp
+
+from astrbot.api import AstrBotConfig, logger
+from astrbot.api.event import AstrMessageEvent, MessageEventResult, filter
 from astrbot.api.star import Context, Star, register
-from astrbot.api import logger
-from astrbot.api import AstrBotConfig
 
 
 @register("astrbot_plugin_nbalance", "Radiant303", "查询 NewAPI 用户余额", "v1.0.0")
@@ -14,7 +14,9 @@ class BalancePlugin(Star):
         self.config = config
 
         # 新的配置项
-        self.api_config = self.config.get("api_config", "https://newapi.com").rstrip('/')
+        self.api_config = self.config.get("api_config", "https://newapi.com").rstrip(
+            "/"
+        )
         self.userid = self.config.get("userid", "10001")
         self.token = self.config.get("token", "token")
         self.enable_llm_tool: bool = self.config.get("enable_llm_tool", False)
@@ -53,12 +55,9 @@ class BalancePlugin(Star):
     async def _query_balance(self) -> str:
         # 构建完整 URL
         url = f"{self.api_config}/api/user/self"
-        
+
         # 构建请求头
-        headers = {
-            "New-API-User": self.userid,
-            "Authorization": f"Bearer {self.token}"
-        }
+        headers = {"New-API-User": self.userid, "Authorization": f"Bearer {self.token}"}
 
         self._ensure_session()
 
@@ -69,7 +68,7 @@ class BalancePlugin(Star):
                     return f"查询失败，状态码: {resp.status}"
 
                 data = await resp.json()
-                
+
                 # 解析响应数据（根据常见的 NewAPI 返回格式）
                 # 假设返回格式: {"success": true, "data": {"balance": 100, "used": 50, "total": 150}}
                 if not data.get("success", True):
@@ -77,12 +76,12 @@ class BalancePlugin(Star):
                     return f"查询失败: {error_msg}"
 
                 user_data = data.get("data", {})
-                
+
                 # 提取余额信息（根据实际 API 返回调整字段名）
                 balance = user_data.get("quota", "N/A")
 
                 # 格式化输出
-                result = f"{float(balance)/500000:.2f}美元"
+                result = f"{float(balance) / 500000:.2f}美元"
 
                 return result
 
