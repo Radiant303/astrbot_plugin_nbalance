@@ -1,10 +1,15 @@
 import asyncio
 
 import aiohttp
+from pydantic import Field
+from pydantic.dataclasses import dataclass
 
 from astrbot.api import AstrBotConfig, logger
-from astrbot.api.event import AstrMessageEvent, MessageEventResult, filter
+from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
+from astrbot.core.agent.run_context import ContextWrapper
+from astrbot.core.agent.tool import FunctionTool, ToolExecResult
+from astrbot.core.astr_agent_context import AstrAgentContext
 
 
 @register("astrbot_plugin_nbalance", "Radiant303", "查询 NewAPI 用户余额", "v1.0.0")
@@ -20,7 +25,8 @@ class BalancePlugin(Star):
         self.userid = self.config.get("userid", "10001")
         self.token = self.config.get("token", "token")
         self.enable_llm_tool: bool = self.config.get("enable_llm_tool", False)
-
+        balance_tool = QueryBalanceTool(plugin=self)
+        self.context.add_llm_tools(balance_tool)
         self.session: aiohttp.ClientSession | None = None
 
     async def initialize(self):
@@ -37,18 +43,6 @@ class BalancePlugin(Star):
 
     @filter.command("余额")
     async def balance(self, event: AstrMessageEvent):
-        result = await self._query_balance()
-        yield event.plain_result(result)
-
-    @filter.llm_tool(name="query_balance")
-    async def query_balance(self, event: AstrMessageEvent) -> MessageEventResult:
-        """
-        查询并返回当前配置的所有余额信息
-        """
-        if not self.enable_llm_tool:
-            yield event.plain_result("余额查询 LLM 工具未启用")
-            return
-
         result = await self._query_balance()
         yield event.plain_result(result)
 
@@ -95,3 +89,29 @@ class BalancePlugin(Star):
         except Exception as e:
             logger.error(f"查询余额异常: {type(e).__name__}: {e}")
             return f"查询异常: {str(e)}"
+
+
+@dataclass
+class QueryBalanceTool(FunctionTool[AstrAgentContext]):
+    name: str = "query_balance"
+    description: str = "查询并返回当前配置的余额信息"
+    parameters: dict = Field(
+        default_factory=lambda: {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        }
+    )
+    # 添加插件实例引用
+    plugin: object = Field(default=None, repr=False)
+
+    async def call(
+        self, context: ContextWrapper[AstrAgentContext], **kwargs
+    ) -> ToolExecResult:
+        # 使用保存的插件实例
+        if not self.plugin:
+            return "插件未正确初始化"
+        if not self.plugin.enable_llm_tool:
+            return "余额查询 LLM 工具未启用"
+        result = await self.plugin._query_balance()
+        return result
