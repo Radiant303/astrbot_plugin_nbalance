@@ -114,4 +114,4 @@ class QueryBalanceTool(FunctionTool[AstrAgentContext]):
         if not self.plugin.enable_llm_tool:
             return "余额查询 LLM 工具未启用"
         result = await self.plugin._query_balance()
-        return result
+        return ToolExecResult(result)
