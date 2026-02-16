@@ -25,12 +25,13 @@ class BalancePlugin(Star):
         self.userid = self.config.get("userid", "10001")
         self.token = self.config.get("token", "token")
         self.enable_llm_tool: bool = self.config.get("enable_llm_tool", False)
-        balance_tool = QueryBalanceTool(plugin=self)
-        self.context.add_llm_tools(balance_tool)
         self.session: aiohttp.ClientSession | None = None
 
     async def initialize(self):
         logger.info("BalancePlugin initialize called")
+        if self.enable_llm_tool:
+            balance_tool = QueryBalanceTool(plugin=self)
+            self.context.add_llm_tools(balance_tool)
 
     async def terminate(self):
         if self.session and not self.session.closed:
